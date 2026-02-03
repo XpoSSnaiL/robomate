@@ -1,2 +1,2 @@
 WeekStart,WeekEnd,NewRequests,ClosedRequests,AvgProcessingTimeHours,Top3Consultants
-2026-02-02,2026-02-09,5,0,,[]
+2026-02-02,2026-02-09,5,4,,"[('Валера', 2), ('Дима', 1), ('Вася', 1)]"

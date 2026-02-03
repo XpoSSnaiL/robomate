@@ -6,6 +6,7 @@ from collections import Counter
 # Airtable configuration
 BASE_ID = "apphxXvfsb9LwRMNy"
 TABLE = "Requests"
+CONSULTANTS_TABLE = "Consultants"
 API_TOKEN = "patiI7eldnarQBITy.5c2e304bd90f127c8789622852ecec1d10a728ad199f3f77155e85d5be00bb41"
 HEADERS = {"Authorization": f"Bearer {API_TOKEN}"}
 
@@ -23,6 +24,26 @@ def fetch_requests():
             break
     return all_records
 
+def fetch_consultants():
+    url = f"https://api.airtable.com/v0/{BASE_ID}/{CONSULTANTS_TABLE}"
+    all_records = []
+    offset = None
+
+    while True:
+        params = {"offset": offset} if offset else {}
+        response = requests.get(url, headers=HEADERS, params=params).json()
+        all_records.extend(response.get("records", []))
+        offset = response.get("offset")
+        if not offset:
+            break
+
+    # dict: {record_id: consultant_name}
+    return {
+        r["id"]: r["fields"].get("Name", "Unknown")
+        for r in all_records
+    }
+
+
 # Process data
 records = fetch_requests()
 data = []
@@ -37,12 +58,14 @@ for r in records:
         "ClosedAt": fields.get("Closed at")
     })
 
+consultant_map = fetch_consultants()
 df = pd.DataFrame(data)
 
 # Convert Airtable datetimes to timezone-aware UTC
 df["CreatedAt"] = pd.to_datetime(df["CreatedAt"], utc=True)
 df["ClosedAt"] = pd.to_datetime(df["ClosedAt"], utc=True)
 df["TakenIntoWorkAt"] = pd.to_datetime(df["TakenIntoWorkAt"], utc=True)
+df["ConsultantName"] = df["AssignedConsultant"].map(consultant_map)
 
 # Weekly metrics
 today = datetime.now(timezone.utc)  # timezone-aware current datetime
@@ -59,7 +82,7 @@ weekly_df["ProcessingTime"] = (weekly_df["ClosedAt"] - weekly_df["TakenIntoWorkA
 avg_processing_time = weekly_df["ProcessingTime"].mean()
 
 # Top consultants
-consultant_counts = Counter(weekly_df[weekly_df["Status"] == "Closed"]["AssignedConsultant"])
+consultant_counts = Counter(weekly_df[weekly_df["Status"] == "Closed"]["ConsultantName"])
 top_3_consultants = consultant_counts.most_common(3)
 
 # Save report
